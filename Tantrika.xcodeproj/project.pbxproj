@@ -195,6 +195,10 @@
 			);
 			mainGroup = D48A53632F7609D800B11317;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				D48A54AD2F76265100B11317 /* XCRemoteSwiftPackageReference "supabase-swift" */,
+				D42D7A0F2F7642B0009020D5 /* XCRemoteSwiftPackageReference "purchases-ios" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = D48A536D2F7609D800B11317 /* Products */;
 			projectDirPath = "";
@@ -578,6 +582,25 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		D42D7A0F2F7642B0009020D5 /* XCRemoteSwiftPackageReference "purchases-ios" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/RevenueCat/purchases-ios";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 5.67.0;
+			};
+		};
+		D48A54AD2F76265100B11317 /* XCRemoteSwiftPackageReference "supabase-swift" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/supabase/supabase-swift";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.5.1;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
 	};
 	rootObject = D48A53642F7609D800B11317 /* Project object */;
 }
