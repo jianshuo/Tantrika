@@ -1,11 +1,10 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-// Environment variables (set in Supabase dashboard — never hardcoded)
+// Environment variables — only Supabase credentials needed (no CF signing keys)
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-const CF_ACCOUNT_ID = Deno.env.get("CF_ACCOUNT_ID")!;
-const CF_STREAM_SIGNING_KEY_ID = Deno.env.get("CF_STREAM_SIGNING_KEY_ID")!;
-const CF_STREAM_SIGNING_SECRET = Deno.env.get("CF_STREAM_SIGNING_SECRET")!;
+// Cloudflare Stream subdomain (no signing — videos must be set to public in CF dashboard)
+const CF_CUSTOMER_SUBDOMAIN = Deno.env.get("CF_CUSTOMER_SUBDOMAIN") ?? "customer-h0sfnfbe1tutii84.cloudflarestream.com";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -78,16 +77,12 @@ Deno.serve(async (req) => {
       }
     }
 
-    // 5. Sign Cloudflare Stream URL (1h TTL)
-    // Demo mode: if cf_video_id is a full HTTPS URL, return it directly.
-    // This allows testing the full auth/subscription flow without CF credentials.
-    // In production, replace demo HLS URLs with real Cloudflare Stream video IDs.
-    let videoUrl: string;
-    if (lesson.cf_video_id.startsWith("https://")) {
-      videoUrl = lesson.cf_video_id;
-    } else {
-      videoUrl = await signCloudflareStreamUrl(lesson.cf_video_id, 3600);
-    }
+    // 5. Build video URL (unsigned — videos must be public in Cloudflare Stream dashboard)
+    // If cf_video_id is already a full URL (demo/testing), return it directly.
+    // Otherwise build the standard Cloudflare Stream HLS manifest URL.
+    const videoUrl = lesson.cf_video_id.startsWith("https://")
+      ? lesson.cf_video_id
+      : `https://${CF_CUSTOMER_SUBDOMAIN}/${lesson.cf_video_id}/manifest/video.m3u8`;
 
     return new Response(JSON.stringify({ url: videoUrl }), {
       status: 200,
@@ -95,58 +90,10 @@ Deno.serve(async (req) => {
     });
 
   } catch (err) {
-    console.error("sign-video-url error:", err);
+    console.error("get-video-url error:", err);
     return new Response(JSON.stringify({ error: "Internal server error" }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 });
-
-// ---------------------------------------------------------------------------
-// Cloudflare Stream signed URL via RSA-PSS JWT
-// Docs: https://developers.cloudflare.com/stream/viewing-videos/securing-your-stream/
-// ---------------------------------------------------------------------------
-
-async function signCloudflareStreamUrl(videoId: string, ttlSeconds: number): Promise<string> {
-  const expiresAt = Math.floor(Date.now() / 1000) + ttlSeconds;
-
-  const header = { alg: "RS256", kid: CF_STREAM_SIGNING_KEY_ID };
-  const payload = {
-    sub: videoId,
-    kid: CF_STREAM_SIGNING_KEY_ID,
-    exp: expiresAt,
-    accessRules: [{ type: "any", action: "allow" }],
-  };
-
-  const encodedHeader  = btoa(JSON.stringify(header)).replace(/=/g, "").replace(/\+/g, "-").replace(/\//g, "_");
-  const encodedPayload = btoa(JSON.stringify(payload)).replace(/=/g, "").replace(/\+/g, "-").replace(/\//g, "_");
-  const signingInput   = `${encodedHeader}.${encodedPayload}`;
-
-  // Import PEM key
-  const pem = CF_STREAM_SIGNING_SECRET
-    .replace(/-----BEGIN RSA PRIVATE KEY-----/, "")
-    .replace(/-----END RSA PRIVATE KEY-----/, "")
-    .replace(/\s+/g, "");
-  const keyData = Uint8Array.from(atob(pem), (c) => c.charCodeAt(0));
-
-  const cryptoKey = await crypto.subtle.importKey(
-    "pkcs8",
-    keyData,
-    { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" },
-    false,
-    ["sign"]
-  );
-
-  const signature = await crypto.subtle.sign(
-    "RSASSA-PKCS1-v1_5",
-    cryptoKey,
-    new TextEncoder().encode(signingInput)
-  );
-
-  const encodedSignature = btoa(String.fromCharCode(...new Uint8Array(signature)))
-    .replace(/=/g, "").replace(/\+/g, "-").replace(/\//g, "_");
-
-  const token = `${signingInput}.${encodedSignature}`;
-  return `https://customer-${CF_ACCOUNT_ID}.cloudflarestream.com/${token}/manifest/video.m3u8`;
-}
