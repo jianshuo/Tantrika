@@ -79,9 +79,17 @@ Deno.serve(async (req) => {
     }
 
     // 5. Sign Cloudflare Stream URL (1h TTL)
-    const signedUrl = await signCloudflareStreamUrl(lesson.cf_video_id, 3600);
+    // Demo mode: if cf_video_id is a full HTTPS URL, return it directly.
+    // This allows testing the full auth/subscription flow without CF credentials.
+    // In production, replace demo HLS URLs with real Cloudflare Stream video IDs.
+    let videoUrl: string;
+    if (lesson.cf_video_id.startsWith("https://")) {
+      videoUrl = lesson.cf_video_id;
+    } else {
+      videoUrl = await signCloudflareStreamUrl(lesson.cf_video_id, 3600);
+    }
 
-    return new Response(JSON.stringify({ url: signedUrl }), {
+    return new Response(JSON.stringify({ url: videoUrl }), {
       status: 200,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
