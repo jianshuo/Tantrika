@@ -38,7 +38,7 @@ jobs:
 
       - name: Seed demo data (manual trigger only)
         if: ${{ github.event.inputs.run_seed == 'true' }}
-        run: supabase db execute --file supabase/seed.sql
+        run: supabase db query --file supabase/seed.sql
 
       - name: Deploy Edge Function
         run: supabase functions deploy sign-video-url --project-ref $PROJECT_REF
